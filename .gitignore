@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# 임시 파일
+*.tmp

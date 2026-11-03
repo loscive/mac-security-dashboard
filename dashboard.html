@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mac 보안 대시보드</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --text: #1c1f24; --muted: #6b7280; --line: #e3e6ea;
+  --accent: #2563eb; --ok: #15803d; --ok-bg: #e8f5ec; --warn: #b45309; --warn-bg: #fdf3e2;
+  --bad: #b91c1c; --bad-bg: #fdecec; --code: #f1f3f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317; --panel: #1a1d23; --text: #e6e8eb; --muted: #9aa1ab; --line: #2b3038;
+    --accent: #60a5fa; --ok: #4ade80; --ok-bg: #16281d; --warn: #fbbf24; --warn-bg: #2d2412;
+    --bad: #f87171; --bad-bg: #2e1717; --code: #22262d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+header { padding: 20px 24px 0; max-width: 1080px; margin: 0 auto; }
+header.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+header h1 { margin: 0; font-size: 20px; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; max-width: 1080px; margin: 16px auto 0; padding: 0 24px;
+  border-bottom: 1px solid var(--line); }
+nav button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px;
+  color: var(--muted); font: inherit; cursor: pointer; }
+nav button.active { color: var(--text); border-color: var(--accent); font-weight: 600; }
+nav button.busy::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%;
+  background: var(--accent); vertical-align: middle; animation: blink 1s infinite alternate; }
+@keyframes blink { from { opacity: 1; } to { opacity: .25; } }
+.flash { animation: flash .9s ease-out; }
+@keyframes flash { from { background: var(--ok-bg); } to { background: var(--panel); } }
+main { max-width: 1080px; margin: 0 auto; padding: 20px 24px 48px; }
+section { display: none; } section.active { display: block; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 10px; font-size: 15px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.check { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.check b { display: block; margin-bottom: 2px; }
+.check small { color: var(--muted); }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 6px; font-weight: 600; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.score { display: flex; align-items: center; gap: 16px; }
+.score .num { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button.btn { font: inherit; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); cursor: pointer; }
+button.btn:hover { border-color: var(--accent); }
+button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.btn.danger { color: var(--bad); }
+button.btn:disabled { opacity: .5; cursor: default; }
+input[type=text] { font: inherit; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); flex: 1; min-width: 200px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; }
+td.path { word-break: break-all; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.muted { color: var(--muted); }
+pre { background: var(--code); padding: 10px; border-radius: 7px; overflow-x: auto; font-size: 12px; max-height: 260px; }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.progress { height: 6px; background: var(--code); border-radius: 99px; overflow: hidden; margin: 8px 0; }
+.progress div { height: 100%; width: 30%; background: var(--accent); animation: slide 1.2s infinite ease-in-out; }
+@keyframes slide { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+#toast.show { opacity: 1; }
+@media (max-width: 600px) { header, nav, main { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>🛡️ Mac 보안 대시보드</h1>
+    <p id="sub">불러오는 중…</p>
+  </div>
+  <button class="btn" onclick="quitApp()">종료</button>
+</header>
+<div id="offline" class="card" style="display:none;max-width:1032px;margin:16px auto 0">
+  대시보드가 종료되었습니다. 이 탭을 닫으셔도 됩니다. 다시 쓰려면 응용 프로그램에서 <b>Mac 보안 대시보드</b>를 실행하세요.
+</div>
+<nav>
+  <button data-tab="overview" class="active">개요</button>
+  <button data-tab="firewall">방화벽</button>
+  <button data-tab="scan">바이러스 검사</button>
+  <button data-tab="apps">앱 서명 검사</button>
+  <button data-tab="launch">자동 실행 항목</button>
+  <button data-tab="quarantine">격리함</button>
+</nav>
+<main>
+  <section id="overview" class="active">
+    <div class="card" id="active-jobs" style="display:none"></div>
+    <div class="card score">
+      <div class="num" id="score">–</div>
+      <div><b>보안 점수</b><div class="muted" id="score-note">macOS 보안 기능 점검 결과</div></div>
+      <div style="margin-left:auto"><button class="btn" id="recheck">다시 점검</button></div>
+    </div>
+    <div class="card"><h2>점검 항목</h2><div class="grid" id="checks"></div></div>
+    <div class="card"><h2>최근 검사 기록</h2><div id="history" class="muted">기록 없음</div></div>
+  </section>
+
+  <section id="firewall">
+    <div class="card">
+      <h2>방화벽 설정</h2>
+      <p class="muted">변경할 때마다 macOS 관리자 암호 창이 뜹니다. 암호는 이 프로그램에 저장되지 않습니다.</p>
+      <table>
+        <tr><td>방화벽</td><td id="fw-enabled"></td><td><button class="btn" id="fw-enabled-btn"></button></td></tr>
+        <tr><td>스텔스 모드 <span class="muted">(ping·포트 탐색에 응답 안 함)</span></td><td id="fw-stealth"></td><td><button class="btn" id="fw-stealth-btn"></button></td></tr>
+        <tr><td>모든 수신 연결 차단 <span class="muted">(공용 Wi-Fi용, 파일 공유 등도 막힘)</span></td><td id="fw-blockall"></td><td><button class="btn" id="fw-blockall-btn"></button></td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2>앱별 수신 연결 규칙</h2>
+      <table><thead><tr><th>앱</th><th>상태</th><th></th></tr></thead><tbody id="fw-apps"></tbody></table>
+    </div>
+  </section>
+
+  <section id="scan">
+    <div class="card" id="clam-missing" style="display:none">
+      <h2>ClamAV 설치 필요</h2>
+      <p>바이러스 검사에는 무료 오픈소스 백신 <b>ClamAV</b>가 필요합니다. 터미널에서 아래 순서대로 실행하세요.</p>
+      <div id="brew-step">
+        <p class="muted">1) Homebrew 설치 (없는 경우)</p>
+        <pre>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
+      </div>
+      <p class="muted">2) ClamAV 설치</p>
+      <pre>brew install clamav</pre>
+      <p class="muted">3) 이 페이지를 새로 고친 뒤 <b>바이러스 DB 업데이트</b>를 누르세요 (설정 파일은 자동으로 만들어집니다).</p>
+    </div>
+    <div class="card" id="clam-panel" style="display:none">
+      <h2>ClamAV 검사</h2>
+      <p class="muted" id="clam-info"></p>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="scan-path" value="~/Downloads">
+        <button class="btn" onclick="setPath('~/Downloads')">다운로드</button>
+        <button class="btn" onclick="setPath('~/Desktop')">데스크탑</button>
+        <button class="btn" onclick="setPath('~/Documents')">문서</button>
+        <button class="btn" onclick="setPath('~')">홈 전체</button>
+      </div>
+      <div class="row">
+        <button class="btn primary" onclick="startJob('clamav')">검사 시작</button>
+        <button class="btn" onclick="startJob('freshclam')">바이러스 DB 업데이트</button>
+      </div>
+    </div>
+    <div class="card" id="scan-job" style="display:none"></div>
+  </section>
+
+  <section id="apps">
+    <div class="card">
+      <h2>설치된 앱 서명·공증 검사</h2>
+      <p class="muted">/Applications 의 모든 앱을 Gatekeeper(spctl)로 검사해 서명이 깨졌거나 공증되지 않은 앱을 찾습니다.</p>
+      <button class="btn primary" onclick="startJob('apps')">검사 시작</button>
+    </div>
+    <div class="card" id="apps-job" style="display:none"></div>
+  </section>
+
+  <section id="launch">
+    <div class="card">
+      <h2>자동 실행 항목 (LaunchAgents / LaunchDaemons)</h2>
+      <p class="muted">악성코드가 재부팅 후에도 살아남기 위해 주로 숨는 곳입니다. 경고가 있는 항목을 확인하세요.</p>
+      <button class="btn" onclick="loadLaunch()">다시 불러오기</button>
+      <div id="launch-list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section id="quarantine">
+    <div class="card">
+      <h2>격리함</h2>
+      <p class="muted">격리된 파일은 실행 권한이 제거된 채 보관됩니다. 삭제는 휴지통으로 이동하며, 완전 삭제는 휴지통에서 직접 하세요.</p>
+      <div id="q-list"></div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const jobBox = { clamav: "scan-job", freshclam: "scan-job", apps: "apps-job" };
+const KIND = { clamav: "바이러스 검사", freshclam: "DB 업데이트", apps: "앱 서명 검사" };
+
+async function api(path, body) {
+  const opt = { headers: { "X-Token": TOKEN } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  let r;
+  try { r = await fetch(path, opt); } catch (e) { throw new Error("대시보드에 연결할 수 없습니다. 앱을 다시 실행하세요."); }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "요청 실패 (" + r.status + ")");
+  return data;
+}
+let toastTimer;
+function toast(msg, ms = 3500) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+// 버튼 동작을 감싸서 실패하면 원인을 알려준다.
+const safe = (fn) => async (...a) => { try { await fn(...a); } catch (e) { toast("실패: " + e.message, 6000); } };
+
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach((e) => e.classList.remove("active"));
+  b.classList.add("active"); $(b.dataset.tab).classList.add("active");
+  const load = ({ firewall: loadFirewallApps, launch: loadLaunch, quarantine: loadQuarantine, overview: loadHistory })[b.dataset.tab];
+  if (load) safe(load)();
+});
+
+async function loadStatus() {
+  const st = await api("/api/status");
+  $("sub").textContent = `${st.host} · 마지막 점검 ${st.checked_at}`;
+  $("score").textContent = st.score;
+  $("score").style.color = st.score >= 85 ? "var(--ok)" : st.score >= 60 ? "var(--warn)" : "var(--bad)";
+  $("checks").innerHTML = st.checks.map((c) => `<div class="check"><b>${esc(c.name)} <span class="pill ${c.ok ? "ok" : "warn"}">${c.ok ? "양호" : "주의"}</span></b><small>${esc(c.detail)}</small></div>`).join("");
+  const fw = st.firewall;
+  fwRow("enabled", fw.enabled, "enable", "disable");
+  fwRow("stealth", fw.stealth, "stealth_on", "stealth_off");
+  fwRow("blockall", fw.block_all, "blockall_on", "blockall_off");
+  const clam = st.clamav;
+  $("clam-missing").style.display = clam.installed ? "none" : "";
+  $("clam-panel").style.display = clam.installed ? "" : "none";
+  $("brew-step").style.display = clam.brew ? "none" : "";
+  if (clam.installed) $("clam-info").textContent = `ClamAV ${clam.version} · 바이러스 DB 날짜: ${clam.db_date || "없음 — 먼저 업데이트하세요"}`;
+  return st;
+}
+function fwRow(key, on, onAct, offAct) {
+  $("fw-" + key).innerHTML = `<span class="pill ${on ? "ok" : "warn"}">${on ? "켜짐" : "꺼짐"}</span>`;
+  const btn = $("fw-" + key + "-btn");
+  btn.textContent = on ? "끄기" : "켜기";
+  btn.onclick = () => fwAction(on ? offAct : onAct);
+}
+const fwAction = safe(async (action, app) => {
+  toast("관리자 암호 창을 확인하세요…", 60000);
+  const r = await api("/api/firewall", { action, app });
+  toast(r.ok ? "적용되었습니다." : "실패: " + (r.error || "알 수 없는 오류"), r.ok ? 3500 : 6000);
+  await loadStatus(); await loadFirewallApps();
+});
+async function loadFirewallApps() {
+  const apps = await api("/api/firewall/apps");
+  $("fw-apps").innerHTML = apps.length ? apps.map((a) => `<tr><td class="path">${esc(a.path)}</td>
+    <td><span class="pill ${a.allowed ? "ok" : "bad"}">${a.allowed ? "허용" : "차단"}</span></td>
+    <td class="row"><button class="btn" data-act="${a.allowed ? "block" : "allow"}" data-app="${esc(a.path)}">${a.allowed ? "차단" : "허용"}</button>
+    <button class="btn danger" data-act="remove" data-app="${esc(a.path)}">목록에서 제거</button></td></tr>`).join("")
+    : `<tr><td colspan="3" class="muted">등록된 앱 없음</td></tr>`;
+  $("fw-apps").querySelectorAll("button").forEach((b) => b.onclick = () => fwAction(b.dataset.act, b.dataset.app));
+}
+
+function setPath(p) { $("scan-path").value = p; }
+async function startJob(kind) {
+  try {
+    const job = await api("/api/jobs", { kind, target: kind === "clamav" ? $("scan-path").value : undefined });
+    if (job.already) toast("이미 진행 중인 작업이 있어 그 진행 상황을 보여드립니다.");
+    pollJob(job.id, jobBox[kind]);
+  } catch (e) { toast(e.message, 6000); }
+}
+// 작업 진행 상황은 서버가 기억한다. 화면은 언제든(새로 고침, 새 탭, 다른 앱 갔다 오기) 서버에서 다시 받아온다.
+const polling = new Set();
+async function pollJob(id, boxId) {
+  if (polling.has(id)) return;  // 같은 작업을 두 번 따라가지 않는다
+  polling.add(id);
+  let failures = 0;
+  while (true) {
+    let job;
+    try { job = await api("/api/jobs/" + id); failures = 0; }
+    catch (e) {
+      // 브라우저가 뒤에 있는 동안 요청이 끊길 수 있다. 멈추지 말고 잠시 뒤 다시 시도한다.
+      if (++failures >= 5) { polling.delete(id); return toast("진행 상황을 불러오지 못했습니다: " + e.message, 6000); }
+      await sleep(3000); continue;
+    }
+    renderJob(job, $(boxId));
+    markBusy();
+    if (job.state !== "running") {
+      polling.delete(id);
+      safe(loadStatus)(); safe(loadHistory)(); refreshActiveJobs();
+      if (job.kind === "freshclam" && job.state === "done") toast("바이러스 DB가 최신입니다.");
+      return;
+    }
+    await sleep(1000);
+  }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let lastJobs = [];
+// 서버에 있는 작업 목록으로 각 상자에 가장 최근 작업을 다시 그리고, 진행 중이면 계속 따라간다.
+async function resumeJobs() {
+  try { lastJobs = await api("/api/jobs"); } catch (e) { return; }
+  for (const [boxId, kinds] of [["scan-job", ["clamav", "freshclam"]], ["apps-job", ["apps"]]]) {
+    const job = lastJobs.find((j) => kinds.includes(j.kind));  // 최신순으로 온다
+    if (!job) continue;
+    if (job.state === "running") pollJob(job.id, boxId);
+    else if (!polling.has(job.id)) renderJob(job, $(boxId));
+  }
+  markBusy(); refreshActiveJobs();
+}
+// 작업이 진행 중인 탭 이름 옆에 깜빡이는 점을 표시한다.
+function markBusy() {
+  const busy = (boxId, kinds) => !!$(boxId).querySelector(".progress") ||
+    lastJobs.some((j) => kinds.includes(j.kind) && j.state === "running");
+  document.querySelector("nav button[data-tab=scan]").classList.toggle("busy", busy("scan-job", ["clamav", "freshclam"]));
+  document.querySelector("nav button[data-tab=apps]").classList.toggle("busy", busy("apps-job", ["apps"]));
+}
+async function refreshActiveJobs() {
+  try { lastJobs = await api("/api/jobs"); } catch (e) { return; }
+  const active = lastJobs.filter((j) => j.state === "running");
+  const box = $("active-jobs");
+  box.style.display = active.length ? "" : "none";
+  box.innerHTML = active.map((j) => `<div class="row"><span class="pill warn">진행 중</span>
+    <b>${KIND[j.kind]}</b><span class="muted">${esc(j.target)} · ${j.scanned}개 검사${j.findings.length ? ` · <span style="color:var(--bad)">발견 ${j.findings.length}건</span>` : ""}</span>
+    <button class="btn" style="margin-left:auto" data-go="${j.kind === "apps" ? "apps" : "scan"}">진행 상황 보기</button></div>`).join("");
+  box.querySelectorAll("button[data-go]").forEach((b) => b.onclick = () => document.querySelector(`nav button[data-tab=${b.dataset.go}]`).click());
+  markBusy();
+}
+setInterval(() => { if (!document.hidden && $("overview").classList.contains("active")) refreshActiveJobs(); }, 3000);
+// 진행 중에는 1초마다 다시 그린다. 버튼까지 매번 새로 만들면 누르는 도중 버튼이 바뀌어 클릭이 무시되므로,
+// 바뀐 부분만 고치고 버튼은 그대로 둔다.
+function setHTML(el, html) {
+  if (el._html === html) return false;
+  el.innerHTML = html; el._html = html;
+  return true;
+}
+function renderJob(job, box) {
+  box.style.display = "";
+  if (box.dataset.jobId !== job.id) {
+    box.dataset.jobId = job.id;
+    box.innerHTML = ["status", "run", "skipped", "findings", "log"].map((n) => `<div data-part="${n}"></div>`).join("");
+  }
+  const part = (n) => box.querySelector(`[data-part=${n}]`);
+  const running = job.state === "running";
+  const stateText = { running: "진행 중", done: "완료", cancelled: "취소됨", error: "오류" }[job.state];
+  const found = job.findings.length;
+
+  setHTML(part("status"), `<h2>${KIND[job.kind]} — ${stateText}</h2>
+    <div class="muted">${esc(job.target)} · 시작 ${job.started}${job.finished ? " · 종료 " + job.finished : ""} · 검사 ${job.scanned}개${job.skipped ? " · 검사 못함 " + job.skipped + "개" : ""}</div>
+    ${job.error ? `<p><span class="pill bad">오류</span> ${esc(job.error)}</p>` : ""}`);
+
+  // 진행 막대·취소 버튼: 작업이 진행 중인 동안 한 번만 만든다.
+  const run = part("run");
+  if (running && !run.querySelector("button[data-cancel]")) {
+    run.innerHTML = `<div class="progress"><div></div></div>
+      <div class="muted current" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <button class="btn" style="margin-top:8px" data-cancel="1">${job.kind === "freshclam" ? "중지" : "검사 중지"}</button>`;
+    const btn = run.querySelector("button[data-cancel]");
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = "중지하는 중…";
+      try {
+        const r = await api("/api/jobs/cancel", { id: job.id });
+        toast(r.ok ? "중지했습니다." : "이미 끝난 작업입니다.");
+      } catch (e) { btn.disabled = false; btn.textContent = "다시 중지"; toast("중지 실패: " + e.message, 6000); }
+    };
+  } else if (!running) run.innerHTML = "";
+  const current = run.querySelector(".current");
+  if (current) {
+    current.textContent = job.current || (job.kind === "clamav" ? "바이러스 DB 불러오는 중…" : "");
+    current.title = job.current || "";
+  }
+
+  // 검사 못한 파일 안내: 버튼이 있으니 한 번 만들고 숫자와 목록만 고친다.
+  const skipped = part("skipped");
+  if (job.skipped && !skipped.firstChild) {
+    skipped.innerHTML = `<div class="card" style="background:var(--warn-bg);border-color:transparent;margin:10px 0">
+      <b style="color:var(--warn)">⚠️ 파일 <span class="n"></span>개는 접근 권한이 없어 검사하지 못했습니다.</b>
+      <div style="margin:4px 0 8px">macOS 개인정보 보호 설정에서 <b>전체 디스크 접근 권한</b>에 <b>Mac 보안 대시보드</b>(목록에 없으면 <b>Python</b>)을 추가한 뒤 다시 검사하세요.</div>
+      <button class="btn" data-privacy="1">개인정보 보호 설정 열기</button>
+      <details style="margin-top:8px"><summary class="muted">검사하지 못한 파일 보기<span class="more"></span></summary><pre></pre></details></div>`;
+    skipped.querySelector("button[data-privacy]").onclick = safe(() => api("/api/open-privacy", {}));
+  }
+  if (job.skipped) {
+    skipped.querySelector(".n").textContent = job.skipped;
+    skipped.querySelector(".more").textContent = job.skipped > job.skipped_paths.length ? ` (처음 ${job.skipped_paths.length}개)` : "";
+    skipped.querySelector("pre").textContent = job.skipped_paths.join("\n");
+  }
+
+  let fhtml = "";
+  if (job.kind !== "freshclam") {
+    if (found) fhtml = `<p><span class="pill bad">발견 ${found}건</span></p><table><thead><tr><th>파일</th><th>탐지 내용</th><th></th></tr></thead><tbody>` +
+      job.findings.map((f, i) => `<tr><td class="path">${esc(f.path)}</td><td>${esc(f.threat)}</td><td class="row">
+        <button class="btn" data-i="${i}" data-a="reveal">Finder에서 보기</button>
+        ${job.kind === "clamav" ? `<button class="btn danger" data-i="${i}" data-a="q">격리</button>` : ""}</td></tr>`).join("") + "</tbody></table>";
+    else if (job.state === "done" && !job.error) fhtml = job.skipped
+      ? `<p><span class="pill warn">일부만 검사됨</span> 검사한 파일에서는 위협이 발견되지 않았습니다.</p>`
+      : `<p><span class="pill ok">문제 없음</span> 위협이 발견되지 않았습니다.</p>`;
+  }
+  if (setHTML(part("findings"), fhtml)) {
+    part("findings").querySelectorAll("button[data-a]").forEach((b) => b.onclick = safe(async () => {
+      const f = job.findings[b.dataset.i];
+      if (b.dataset.a === "reveal") return api("/api/reveal", { path: f.path });
+      if (!confirm(`이 파일을 격리할까요?\n${f.path}`)) return;
+      const r = await api("/api/quarantine/add", { path: f.path, threat: f.threat });
+      toast(r.ok ? "격리했습니다." : r.error, r.ok ? 3500 : 6000); if (r.ok) { b.disabled = true; b.textContent = "격리됨"; }
+    }));
+  }
+
+  setHTML(part("log"), job.log.length && !running
+    ? `<details ${job.kind === "freshclam" ? "open" : ""}><summary class="muted">상세 로그</summary><pre>${esc(job.log.join("\n"))}</pre></details>` : "");
+}
+
+function sigText(s) {
+  if (!s) return "";
+  if (!s.signed) return s.note;
+  return s.valid ? s.authority : `${s.authority} — ${s.note}`;
+}
+async function loadLaunch() {
+  $("launch-list").innerHTML = `<div class="muted">점검 중… (처음에는 System Events 제어 허용 창이 뜰 수 있습니다)</div>`;
+  const data = await api("/api/launch-items");
+  const items = data.launch.concat(data.login.items);
+  items.sort((a, b) => b.warnings.length - a.warnings.length);
+  $("launch-list").innerHTML = (data.login.error ? `<p><span class="pill warn">로그인 항목</span> ${esc(data.login.error)}</p>` : "") +
+    `<table><thead><tr><th>항목</th><th>실행 파일 / 서명</th><th>상태</th></tr></thead><tbody>` +
+    items.map((i) => `<tr><td><b>${esc(i.label)}</b><div class="muted">${esc(i.scope)}</div></td>
+      <td class="path">${esc(i.program || "-")}<div class="muted">${esc(sigText(i.signature))}</div></td>
+      <td>${i.warnings.length ? i.warnings.map((w) => `<div><span class="pill ${w.includes("변조") ? "bad" : "warn"}">${esc(w)}</span></div>`).join("") : `<span class="pill ok">정상</span>`}
+      ${i.plist ? `<div style="margin-top:4px"><button class="btn" data-p="${esc(i.plist)}">Finder에서 보기</button></div>` : ""}</td></tr>`).join("") + "</tbody></table>";
+  $("launch-list").querySelectorAll("button[data-p]").forEach((b) => b.onclick = safe(() => api("/api/reveal", { path: b.dataset.p })));
+}
+
+async function loadQuarantine() {
+  const list = await api("/api/quarantine");
+  $("q-list").innerHTML = list.length ? `<table><thead><tr><th>원래 위치</th><th>탐지 내용</th><th>격리 일시</th><th></th></tr></thead><tbody>` +
+    list.map((q) => `<tr><td class="path">${esc(q.original)}</td><td>${esc(q.threat)}</td><td>${esc(q.date)}</td>
+      <td class="row"><button class="btn" data-a="restore" data-id="${q.id}">복원</button><button class="btn danger" data-a="trash" data-id="${q.id}">휴지통으로</button></td></tr>`).join("") + "</tbody></table>"
+    : `<div class="muted">격리된 파일이 없습니다.</div>`;
+  $("q-list").querySelectorAll("button").forEach((b) => b.onclick = safe(async () => {
+    if (b.dataset.a === "restore" && !confirm("위험할 수 있는 파일을 원래 위치로 복원할까요?")) return;
+    const r = await api("/api/quarantine/" + b.dataset.a, { id: b.dataset.id });
+    toast(r.ok ? "처리했습니다." : r.error, r.ok ? 3500 : 6000); await loadQuarantine();
+  }));
+}
+
+async function loadHistory() {
+  const h = await api("/api/history");
+  $("history").innerHTML = h.length ? `<table><thead><tr><th>작업</th><th>대상</th><th>종료</th><th>검사</th><th>검사 못함</th><th>발견</th></tr></thead><tbody>` +
+    h.slice(0, 10).map((x) => `<tr><td>${KIND[x.kind] || esc(x.kind)}${x.state === "cancelled" ? ` <span class="muted">(취소)</span>` : ""}</td><td class="path">${esc(x.target)}</td><td>${esc(x.finished)}</td><td>${x.scanned}</td>
+      <td>${x.skipped ? `<span class="pill warn">${x.skipped}</span>` : "-"}</td>
+      <td>${x.kind === "freshclam" ? "-" : `<span class="pill ${x.found ? "bad" : "ok"}">${x.found}</span>`}</td></tr>`).join("") + "</tbody></table>"
+    : "기록 없음";
+}
+
+function showOffline() {
+  $("offline").style.display = "";
+  document.querySelectorAll("nav, main").forEach((e) => e.style.display = "none");
+}
+async function quitApp() {
+  if (!confirm("대시보드를 종료할까요? 진행 중인 검사도 중단됩니다.")) return;
+  try { await api("/api/shutdown", {}); } catch (e) {}
+  showOffline();
+}
+// 탭이 열려 있는 동안 서버에 신호를 보낸다. 탭을 닫으면 30분 뒤 서버가 스스로 종료된다.
+const ping = () => api("/api/ping").catch(showOffline);
+setInterval(ping, 60000);
+// 다른 앱에 갔다가 돌아오면 서버 연결과 진행 중인 작업을 바로 다시 확인한다.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { ping(); resumeJobs(); } });
+
+$("recheck").onclick = safe(async () => {
+  const b = $("recheck");
+  b.disabled = true; b.textContent = "점검 중…";
+  try {
+    const st = await loadStatus();
+    const bad = st.checks.filter((c) => !c.ok).length;
+    toast(`점검 완료 — 보안 점수 ${st.score}점${bad ? `, 주의 ${bad}건` : ", 모든 항목 양호"}`);
+    for (const el of [document.querySelector(".score"), $("checks")]) {
+      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    }
+  } finally { b.disabled = false; b.textContent = "다시 점검"; }
+});
+
+loadStatus().catch((e) => { $("sub").textContent = "불러오기 실패: " + e.message; });
+safe(loadHistory)();
+resumeJobs();
+</script>
+</body>
+</html>
